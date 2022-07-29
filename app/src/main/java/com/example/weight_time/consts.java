@@ -2,8 +2,8 @@ package com.example.weight_time;
 
 public class consts {
     public static final int updateClockTimeMillis = 200;
-    public static final int MIN_WEIGHT_VALUE = 40;
-    public static final int MAX_WEIGHT_VALUE = 160;
+    public static final int MIN_WEIGHT_VALUE = 3;
+    public static final int MAX_WEIGHT_VALUE = 300;
 
     public static final String defaultFont = "S15.otf";
     public static final String weightFormatterString = "%011.8f";
