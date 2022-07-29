@@ -2,7 +2,6 @@ package com.example.weight_time;
 
 import static com.example.weight_time.consts.tableName;
 import static com.example.weight_time.consts.timestampColumnName;
-import static com.example.weight_time.consts.viewNameMedTime;
 import static com.example.weight_time.consts.weightColumnName;
 
 import android.content.ContentValues;
@@ -10,6 +9,9 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.util.Pair;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class DbHelper {
     private FeedReaderDbHelper dbHelper;
@@ -34,51 +36,66 @@ public class DbHelper {
         dbWrite.insert(tableName, null, values);
     }
 
-    public Pair<Double, Double> GetWeights(double medTime, boolean isFirstPart) {
+    public Pair<Double, Double> GetKoeffs() {
         // Define a projection that specifies which columns from the database
         // you will actually use after this query.
         String[] projection = {
-                "MIN(" + timestampColumnName + ")",
-                "MAX(" + timestampColumnName + ")",
-                "AVG(" + weightColumnName + ")"
+                timestampColumnName,
+                weightColumnName
         };
 
-        // Filter results
-        String selection;
-        if (isFirstPart) {
-            selection = timestampColumnName + " < ?";
-        } else {
-            selection = timestampColumnName + " > ?";
-        }
-
-        String[] selectionArgs = {String.valueOf(medTime)};
+        // How you want the results sorted in the resulting Cursor
+        String sortOrder =
+                timestampColumnName + " ASC";
 
         Cursor cursor = dbRead.query(
                 tableName,   // The table to query
                 projection,                   // The array of columns to return (pass null to get all)
-                selection,              // The columns for the WHERE clause
-                selectionArgs,          // The values for the WHERE clause
+                null,              // The columns for the WHERE clause
+                null,          // The values for the WHERE clause
                 null,                   // don't group the rows
                 null,                   // don't filter by row groups
-                null               // The sort order
+                sortOrder               // The sort order
         );
 
-        cursor.moveToNext();
-
-        double avgTimestamp = (cursor.getDouble(0) + cursor.getDouble(1)) / 2d;
-
-        //Log.e("MAIN", "Timestamp: " + cursor.getDouble(0) + " weight: " + cursor.getDouble(1));
-        Pair<Double, Double> result = new Pair<>(avgTimestamp, cursor.getDouble(2));
+        List<Double> rawX = new ArrayList<>();
+        List<Double> modX = new ArrayList<>();
+        List<Double> rawY = new ArrayList<>();
+        while (cursor.moveToNext()) {
+            rawX.add(cursor.getDouble(0));
+            rawY.add(cursor.getDouble(1));
+        }
         cursor.close();
-        return result;
+
+        int la = rawY.size();
+        if (la < 2) {
+            return new Pair<>(-1d,-1d);
+        }
+        Double minX = rawX.get(0);
+
+        for (int i = 0; i < la; i++) {
+            // Seconds from first calculation
+            modX.add((rawX.get(i) - minX) / 1000);
+        }
+
+        // Calculating K
+        double sumX = CalcSum(modX);
+        double sumY = CalcSum(rawY);
+        double sumXY = CalcSumMultiplication(modX, rawY);
+        double sumXX = CalcSumMultiplication(modX, modX);
+
+        double k = (la * sumXY - sumX * sumY) / (la * sumXX - sumX * sumX);
+        double b = (sumY - k * sumX) / la;
+
+        return new Pair<>(k, b);
     }
 
-    public double GetMedTime() {
+    public long GetStartTime() {
         String[] projection = {
-                "med"
+                "MIN("+timestampColumnName+")"
         };
         Cursor cursor = dbRead.query(
-                viewNameMedTime,                   // The table to query
+                tableName,                   // The table to query
                 projection,                 // The array of columns to return (pass null to get all)
                 null,               // The columns for the WHERE clause
                 null,           // The values for the WHERE clause
@@ -87,13 +104,33 @@ public class DbHelper {
                 null                // The sort order
         );
         cursor.moveToNext();
-        double medTime = cursor.getDouble(0);
+        long startTime = cursor.getLong(0);
         cursor.close();
-        return medTime;
+        return startTime;
     }
 
     public void Destroy() {
         dbHelper.close();
+    }
+
+    private double CalcSum(List<Double> a) {
+        double sum = 0;
+        for (Double value : a) {
+            sum += value;
+        }
+        return sum;
+    }
+
+    private double CalcSumMultiplication(List<Double> a, List<Double> b) {
+        if (a.size() != b.size()) {
+            return 0;
+        }
+        double sum = 0;
+        for (int i = 0; i < a.size(); i++)
+        {
+            sum += a.get(i) * b.get(i);
+        }
+        return sum;
     }
 
     /* Example

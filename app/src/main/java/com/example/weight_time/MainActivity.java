@@ -4,8 +4,6 @@ import static com.example.weight_time.consts.MAX_WEIGHT_VALUE;
 import static com.example.weight_time.consts.MIN_WEIGHT_VALUE;
 import static com.example.weight_time.consts.defaultFont;
 import static com.example.weight_time.consts.updateClockTimeMillis;
-import static com.example.weight_time.consts.viewNameFirstPart;
-import static com.example.weight_time.consts.viewNameLastPart;
 import static com.example.weight_time.consts.weightFormatterString;
 
 import androidx.annotation.Nullable;
@@ -16,14 +14,12 @@ import androidx.lifecycle.Observer;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
-import android.util.Log;
 import android.util.Pair;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -39,6 +35,8 @@ public class MainActivity extends AppCompatActivity {
     private MutableLiveData<Double> k = new MutableLiveData<>(0d);
     private MutableLiveData<Double> b = new MutableLiveData<>(0d);
     private DbHelper db;
+    private long startTime;
+    private boolean appHasEnoughData = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,16 +61,30 @@ public class MainActivity extends AppCompatActivity {
                 } else {
                     arrowV.setImageResource(R.drawable.ic_arrow_up);
                 }
-                arrowV.setVisibility(View.VISIBLE);
+                if (appHasEnoughData) {
+                    arrowV.setVisibility(View.VISIBLE);
+                }
             }
         };
-
         k.observe(this, arrowObserver);
 
         // DB Part
         db = new DbHelper(this);
 
-        recalculateKoef();
+        initStartTime();
+    }
+
+    private void initStartTime() {
+        Executors.newSingleThreadExecutor().execute(new Runnable() {
+            @Override
+            public void run() {
+                long stTime = db.GetStartTime();
+                if (stTime != 0) {
+                    startTime = stTime;
+                    recalculateKoefMNK();
+                }
+            }
+        });
     }
 
     @Override
@@ -88,7 +100,12 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        if (appHasEnoughData) {
+            startTimer();
+        }
+    }
 
+    private void startTimer() {
         // Timer
         if (!timerState) {
             timer = new Timer();
@@ -108,12 +125,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void onTimeChanged() {
-        double weight = getCurrentWeight(System.currentTimeMillis());
+        double weight = getCurrentWeight(((double) (System.currentTimeMillis() - startTime)) / 1000d);
         weightTV.setText(String.format(Locale.ENGLISH, weightFormatterString, weight));
     }
 
-    private double getCurrentWeight(long time) {
-        return k.getValue() * ((double) time) + b.getValue();
+    private double getCurrentWeight(double time) {
+        return k.getValue() * time + b.getValue();
     }
 
     @Override
@@ -147,27 +164,24 @@ public class MainActivity extends AppCompatActivity {
         // Write new value to DB
         db.WriteNewWeight(newWeightValue);
 
-        recalculateKoef();
+        if (appHasEnoughData) {
+            recalculateKoefMNK();
+        } else {
+            initStartTime();
+        }
     }
 
-    private void recalculateKoef() {
+    private void recalculateKoefMNK() {
         Executors.newSingleThreadExecutor().execute(new Runnable() {
             @Override
             public void run() {
-                // get Med
-                double medTime = db.GetMedTime();
-
-                // Calculate new koeff
-                Pair<Double, Double> fp = db.GetWeights(medTime, true);
-                Pair<Double, Double> lp = db.GetWeights(medTime, false);
-
-                // Log.e("MAIN", "First Part: " + fp.first + " : " + fp.second);
-                // Log.e("MAIN", "Second Part: " + lp.first + " : " + lp.second);
-
-                double tmp_k = (lp.second - fp.second) / (lp.first - fp.first);
-                k.postValue(tmp_k);
-                double tmp_b = fp.second - tmp_k * fp.first;
-                b.postValue(tmp_b);
+                Pair<Double, Double> res = db.GetKoeffs();
+                if (!((res.first == -1d) && (res.second == -1d))) {
+                    appHasEnoughData = true;
+                    startTimer();
+                }
+                k.postValue(res.first);
+                b.postValue(res.second);
             }
         });
     }
