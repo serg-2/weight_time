@@ -14,6 +14,7 @@ import androidx.lifecycle.Observer;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.util.Log;
 import android.util.Pair;
 import android.view.View;
 import android.widget.EditText;
@@ -26,16 +27,29 @@ import java.util.TimerTask;
 import java.util.concurrent.Executors;
 
 public class MainActivity extends AppCompatActivity {
-
+    // database
+    private DbHelper db;
+    // timer
     private Timer timer;
+    // timer started?
     private boolean timerState = false;
+    // Main text view
     private TextView weightTV;
+    // Arrow image
     private ImageView arrowV;
+    // Enter of wieght
     private EditText mainET;
+    // Main koeff
     private MutableLiveData<Double> k = new MutableLiveData<>(0d);
     private MutableLiveData<Double> b = new MutableLiveData<>(0d);
-    private DbHelper db;
+
+    // Weight difference calculated vs real
+    private MutableLiveData<Double> weightDifference = new MutableLiveData<>(0d);
+
+    // Time of first weight
     private long startTime;
+
+    // Has enough data to show
     private boolean appHasEnoughData = false;
 
     @Override
@@ -78,11 +92,20 @@ public class MainActivity extends AppCompatActivity {
         Executors.newSingleThreadExecutor().execute(new Runnable() {
             @Override
             public void run() {
+                /* DEPRECATED
                 long stTime = db.GetStartTime();
                 if (stTime != 0) {
                     startTime = stTime;
                     recalculateKoefMNK();
                 }
+                 */
+                startTime = System.currentTimeMillis();
+
+                if (appHasEnoughData) {
+                    double lastDiff = db.GetLastDiff();
+                    weightDifference.postValue(lastDiff);
+                }
+                recalculateKoefMNK();
             }
         });
     }
@@ -119,17 +142,17 @@ public class MainActivity extends AppCompatActivity {
                         }
                     });
                 }
-            }, 0, updateClockTimeMillis);//put here time 1000 milliseconds=1 second
+            }, 0, updateClockTimeMillis); //put here time 1000 milliseconds=1 second
             timerState = true;
         }
     }
 
     private void onTimeChanged() {
-        double weight = getCurrentWeight(((double) (System.currentTimeMillis() - startTime)) / 1000d);
-        weightTV.setText(String.format(Locale.ENGLISH, weightFormatterString, weight));
+        weightTV.setText(String.format(Locale.ENGLISH, weightFormatterString, (getWeight() + weightDifference.getValue())));
     }
 
-    private double getCurrentWeight(double time) {
+    private double getWeight() {
+        double time = ((double) (System.currentTimeMillis() - startTime)) / 1000d;
         return k.getValue() * time + b.getValue();
     }
 
@@ -162,7 +185,15 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // Write new value to DB
-        db.WriteNewWeight(newWeightValue);
+        long curTime = System.currentTimeMillis();
+        startTime = curTime;
+        double difference = newWeightValue - getWeight();
+
+        // Write difference
+        // Log.e("MAIN", "difference: " + String.valueOf(difference));
+        weightDifference.postValue(difference);
+
+        db.WriteNewWeight(newWeightValue, curTime, difference);
 
         if (appHasEnoughData) {
             recalculateKoefMNK();
@@ -185,4 +216,6 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
+
+
 }
