@@ -1,7 +1,6 @@
 package com.example.weight_time;
 
 import static com.example.weight_time.consts.NUMBER_OF_MONTHS_TO_USE;
-import static com.example.weight_time.consts.diffWeightColumnName;
 import static com.example.weight_time.consts.tableName;
 import static com.example.weight_time.consts.timestampColumnName;
 import static com.example.weight_time.consts.weightColumnName;
@@ -22,18 +21,19 @@ public class DbHelper {
     private SQLiteDatabase dbWrite;
     private SQLiteDatabase dbRead;
 
+    private long minX = 0L;
+
     public DbHelper(Context context) {
         dbHelper = new FeedReaderDbHelper(context);
         dbWrite = dbHelper.getWritableDatabase();
         dbRead = dbHelper.getReadableDatabase();
     }
 
-    public void WriteNewWeight(double weight, long curTime, double difference) {
+    public void WriteNewWeight(double weight, long curTime) {
         // Create a new map of values, where column names are the keys
         ContentValues values = new ContentValues();
         values.put(timestampColumnName, curTime);
         values.put(weightColumnName, weight);
-        values.put(diffWeightColumnName, difference);
 
         // Insert the new row, returning the primary key value of the new row
         // long newRowId = dbMain.insert(tableName, null, values);
@@ -78,11 +78,11 @@ public class DbHelper {
         }
 
         // Time of first point
-        Double minX = rawX.get(0);
+        double minimX = rawX.get(0);
 
         for (int i = 0; i < la; i++) {
             // Number of seconds from first calculation
-            modX.add((rawX.get(i) - minX) / 1000);
+            modX.add((rawX.get(i) - minimX) / 1000);
         }
 
         // Calculating K
@@ -91,38 +91,17 @@ public class DbHelper {
         double sumXY = CalcSumMultiplication(modX, rawY);
         double sumXX = CalcSumMultiplication(modX, modX);
 
-        // Calculating k and b for line
+        // Calculating k and b for line in SECONDS
         double k = (la * sumXY - sumX * sumY) / (la * sumXX - sumX * sumX);
         double b = (sumY - k * sumX) / la;
 
         return new Pair<>(k, b);
     }
 
-    /* DEPRECATED
-    public long GetStartTime() {
-        String[] nameOfColumns = {
-                "MIN(" + timestampColumnName + ")"
-        };
-        Cursor cursor = dbRead.query(
-                tableName,                      // The table to query
-                nameOfColumns,                  // The array of columns to return (pass null to get all)
-                timestampColumnName + " > ?",   // The columns for the WHERE clause
-                GetSelectionArgs(),             // The values for the WHERE clause
-                null,                           // don't group the rows
-                null,                           // don't filter by row groups
-                null                            // The sort order
-        );
-        cursor.moveToNext();
-        long startTime = cursor.getLong(0);
-        cursor.close();
-        return startTime;
-    }
-     */
-
-    public double GetLastDiff() {
+    public Pair<Long,Double> GetLastResult() {
         String[] nameOfColumns = {
                 timestampColumnName,
-                diffWeightColumnName
+                weightColumnName
         };
 
         String order = timestampColumnName + " DESC";
@@ -135,10 +114,17 @@ public class DbHelper {
                 null,                           // don't filter by row groups
                 order                           // The sort order
         );
-        cursor.moveToNext();
-        double lastDiff = cursor.getLong(1);
-        cursor.close();
-        return lastDiff;
+
+        if (cursor.getCount() > 0) {
+            cursor.moveToNext();
+            long lastTime = cursor.getLong(0);
+            double lastWeight = cursor.getLong(1);
+            cursor.close();
+            return new Pair<>(lastTime-Double.valueOf(minX).longValue(), lastWeight);
+        } else {
+            cursor.close();
+            return new Pair<>(-1L, -1d);
+        }
     }
 
     private String[] GetSelectionArgs() {
@@ -170,38 +156,34 @@ public class DbHelper {
         return sum;
     }
 
-    /* Example
-    public void GetWeights(double medTime) {
-        // Define a projection that specifies which columns from the database
-        // you will actually use after this query.
-        String[] projection = {
-                timestampColumnName,
-                weightColumnName
-        };
+    public long GetMinTime() {
+        if (minX == 0L) {
+            String[] nameOfColumns = {
+                    timestampColumnName,
+                    weightColumnName
+            };
 
-        // Filter results
-        String selection = timestampColumnName + " > ?";
-        String[] selectionArgs = { String.valueOf(medTime) };
+            // How you want the results sorted in the resulting Cursor
+            String sortOrder =
+                    timestampColumnName + " ASC";
 
-        // How you want the results sorted in the resulting Cursor
-        String sortOrder =
-                timestampColumnName + " ASC";
+            Cursor cursor = dbRead.query(
+                    tableName,                      // The table to query
+                    nameOfColumns,                  // The array of columns to return (pass null to get all)
+                    timestampColumnName + " > ?",   // The columns for the WHERE clause (pass null - without selection)
+                    GetSelectionArgs(),             // The values for the WHERE clause (null if no WHERE)
+                    null,                           // don't group the rows
+                    null,                           // don't filter by row groups
+                    sortOrder                       // The sort order
+            );
+            if (cursor.getCount() > 0) {
+                cursor.moveToNext();
+                long miniTime = cursor.getLong(0);
+                cursor.close();
+                minX = miniTime;
+            }
 
-        Cursor cursor = dbRead.query(
-                viewNameFirstPart,   // The table to query
-                projection,                   // The array of columns to return (pass null to get all)
-                selection,              // The columns for the WHERE clause
-                selectionArgs,          // The values for the WHERE clause
-                null,                   // don't group the rows
-                null,                   // don't filter by row groups
-                null               // The sort order
-        );
-
-        cursor.moveToNext();
-
-        Log.e("MAIN", "Timestamp: " + cursor.getDouble(0) + " weight: " + cursor.getDouble(1));
-
-        cursor.close();
+        }
+        return minX;
     }
-    */
 }
