@@ -37,7 +37,8 @@ public class DbHelper {
 
         // Insert the new row, returning the primary key value of the new row
         // long newRowId = dbMain.insert(tableName, null, values);
-        dbWrite.insert(tableName, null, values);
+        dbWrite.insertOrThrow(tableName, null, values);
+        Log.d("DB", "Values inserted: time: " + curTime + " weight: " + weight);
     }
 
     public Pair<Double, Double> GetKoeffs() {
@@ -62,11 +63,12 @@ public class DbHelper {
                 sortOrder                       // The sort order
         );
 
+        Log.d("DB", "Size of weightings: " + cursor.getCount());
+
         List<Double> rawX = new ArrayList<>();
-        List<Double> modX = new ArrayList<>();
         List<Double> rawY = new ArrayList<>();
         while (cursor.moveToNext()) {
-            rawX.add(cursor.getDouble(0));
+            rawX.add(Long.valueOf(cursor.getLong(0)).doubleValue());
             rawY.add(cursor.getDouble(1));
         }
         cursor.close();
@@ -77,19 +79,11 @@ public class DbHelper {
             return new Pair<>(-1d, -1d);
         }
 
-        // Time of first point
-        double minimX = rawX.get(0);
-
-        for (int i = 0; i < la; i++) {
-            // Number of seconds from first calculation
-            modX.add((rawX.get(i) - minimX) / 1000);
-        }
-
         // Calculating K
-        double sumX = CalcSum(modX);
+        double sumX = CalcSum(rawX);
         double sumY = CalcSum(rawY);
-        double sumXY = CalcSumMultiplication(modX, rawY);
-        double sumXX = CalcSumMultiplication(modX, modX);
+        double sumXY = CalcSumMultiplication(rawX, rawY);
+        double sumXX = CalcSumMultiplication(rawX, rawX);
 
         // Calculating k and b for line in SECONDS
         double k = (la * sumXY - sumX * sumY) / (la * sumXX - sumX * sumX);
@@ -98,7 +92,7 @@ public class DbHelper {
         return new Pair<>(k, b);
     }
 
-    public Pair<Long,Double> GetLastResult() {
+    public Pair<Long, Double> GetLastResult() {
         String[] nameOfColumns = {
                 timestampColumnName,
                 weightColumnName
@@ -120,7 +114,7 @@ public class DbHelper {
             long lastTime = cursor.getLong(0);
             double lastWeight = cursor.getLong(1);
             cursor.close();
-            return new Pair<>(lastTime-Double.valueOf(minX).longValue(), lastWeight);
+            return new Pair<>(lastTime - Double.valueOf(minX).longValue(), lastWeight);
         } else {
             cursor.close();
             return new Pair<>(-1L, -1d);
@@ -128,8 +122,8 @@ public class DbHelper {
     }
 
     private String[] GetSelectionArgs() {
-        // calculate minus 3 months. minus number of months * 30 * 24 * 3600 * 1000
-        long startTime = System.currentTimeMillis() - NUMBER_OF_MONTHS_TO_USE * 30 * 24 * 3600 * 1000;
+        // calculate minus 3 months. minus number of months * 30 * 24 * 3600
+        long startTime = System.currentTimeMillis() / 1000L - NUMBER_OF_MONTHS_TO_USE * 30 * 24 * 3600;
         return new String[]{Long.toString(startTime)};
     }
 
@@ -156,6 +150,7 @@ public class DbHelper {
         return sum;
     }
 
+    /*
     public long GetMinTime() {
         if (minX == 0L) {
             String[] nameOfColumns = {
@@ -186,4 +181,6 @@ public class DbHelper {
         }
         return minX;
     }
+
+     */
 }

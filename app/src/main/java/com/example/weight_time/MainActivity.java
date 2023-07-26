@@ -3,9 +3,10 @@ package com.example.weight_time;
 import static com.example.weight_time.consts.MAX_WEIGHT_VALUE;
 import static com.example.weight_time.consts.MIN_WEIGHT_VALUE;
 import static com.example.weight_time.consts.defaultFont;
-import static com.example.weight_time.consts.n;
+import static com.example.weight_time.consts.logDateFormat;
 import static com.example.weight_time.consts.updateClockTimeMillis;
 import static com.example.weight_time.consts.weightFormatterString;
+import static com.example.weight_time.consts.ws;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
@@ -50,8 +51,11 @@ public class MainActivity extends AppCompatActivity {
     private MutableLiveData<Double> kReal = new MutableLiveData<>(0d);
     private MutableLiveData<Double> bReal = new MutableLiveData<>(0d);
 
-    // Time of first weight
-    private long startTimeMS;
+    // Time of converge
+    private MutableLiveData<Long> timeOfConverge = new MutableLiveData<>(0L);
+
+    // Time of last weighting
+    private long lastWeightTime;
 
     // Has enough data to show
     private boolean appHasEnoughData = false;
@@ -92,10 +96,8 @@ public class MainActivity extends AppCompatActivity {
         Pair<Long, Double> res2 = db.GetLastResult();
         // Check Last Result exists
         if (res2.first != -1L) {
-            // Get Min Time to simplify calculations
-            Log.e("MAIN", "MIN TIME: " + db.GetMinTime());
-
-            startTimeMS = res2.first - db.GetMinTime();
+            Log.e("Last Result", "Weight: " + res2.second + " At: " + logDateFormat.format(new Timestamp(res2.first*1000L)));
+            lastWeightTime = res2.first;
             initAtStart(res2.second);
         }
     }
@@ -106,7 +108,7 @@ public class MainActivity extends AppCompatActivity {
             public void run() {
                 recalculateKoefMNK();
                 if (appHasEnoughData) {
-                    calculateRealLineKoeff(weight, startTimeMS / 1000d);
+                    calculateRealLineKoeff(weight, lastWeightTime);
                     startTimer();
                 }
             }
@@ -155,8 +157,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private double getWeightCalculated() {
-        double timeS = ((double) (System.currentTimeMillis() - db.GetMinTime() + startTimeMS)) / 1000d;
-        return kReal.getValue() * timeS + bReal.getValue();
+        long curTime = System.currentTimeMillis();
+        double timeS = ((double) curTime / 1000d);
+        if (curTime < timeOfConverge.getValue()) {
+            return kReal.getValue() * timeS + bReal.getValue();
+        } else {
+            return k * timeS + b;
+        }
     }
 
     @Override
@@ -191,56 +198,47 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
                 // Write new value to DB
-                long currentTime = System.currentTimeMillis();
-                db.WriteNewWeight(newWeightValue, currentTime);
+                long currentTimeS = System.currentTimeMillis() / 1000L;
+                db.WriteNewWeight(newWeightValue, currentTimeS);
 
-                startTimeMS = currentTime - db.GetMinTime();
+                lastWeightTime = currentTimeS;
 
                 // Recalculate koeff calculated
                 recalculateKoefMNK();
 
                 // Calculate Real line==================================
                 if (appHasEnoughData) {
-                    calculateRealLineKoeff(newWeightValue, startTimeMS / 1000d);
+                    calculateRealLineKoeff(newWeightValue, currentTimeS);
                 }
             }
         });
     }
 
     private void calculateRealLineKoeff(double weight, double timeS) {
-        double realKoeff;
-        double cWeight = timeS * k + b;
 
-        // real higher than calculated and trend to low
-        if ((k < 1) && (weight > cWeight)) {
-            realKoeff = 1 / n;
-        // Real lower than calculated and trend to low
-        } else if ((k < 1) && (weight <= cWeight)) {
-            realKoeff = n;
-        // Real higher than calculated and trend to high
-        } else if ((k > 1) && (weight > cWeight)) {
-            realKoeff = 1/ n;
-        // Real lower than calculated and trend to high
-        } else {
-            realKoeff = n;
-        }
+        // double timeOfConvergenceS = (weight - timeS * k * n - b) / (k * (1 - n));
+        // double weightAtConvergence = timeOfConvergenceS * k + b;
 
-        double timeOfConvergenceS = (weight - timeS * k * realKoeff - b) / (k * (1 - realKoeff));
+        double timeNeededtoConvergeS = (Math.abs((k * timeS + b) - weight) / ws) * 3600 * 24;
+
+        double timeOfConvergenceS = timeS + timeNeededtoConvergeS;
         double weightAtConvergence = timeOfConvergenceS * k + b;
 
-        double kRealz = (weight - weightAtConvergence) / (timeS - timeOfConvergenceS);
-        double bRealz = weightAtConvergence - kRealz * timeOfConvergenceS;
+        // Storing convergence time
+        timeOfConverge.postValue(Double.valueOf(timeOfConvergenceS).longValue() * 1000L);
+
+        Pair<Double, Double> p2 = getLineKoeffByTwoPoints(timeS, weight, timeOfConvergenceS, weightAtConvergence);
+        double kRealz = p2.first;
+        double bRealz = p2.second;
         Log.e("New Converged", "K= " + kRealz + " B= " + bRealz);
 
         // Check time between last real weight and calculated time of convergence.
-        long ttMS = System.currentTimeMillis() - db.GetMinTime();
+        long timeOfCheck = System.currentTimeMillis() / 1000L;
 
         // Logging
-        // 2021-03-24 16:48:05
-        SimpleDateFormat sdf3 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-        Log.e("TIMING", "START TIME=" + sdf3.format(new Timestamp(startTimeMS)) + " CURRENT TIME=" + sdf3.format(new Timestamp(ttMS)) + " TIME OF CONVERGENCE=" + sdf3.format(new Timestamp(Double.valueOf(timeOfConvergenceS * 1000d).longValue())));
+        Log.e("TIMING", "CURRENT TIME=" + logDateFormat.format(new Timestamp(timeOfCheck*1000L)) + " TIME OF CONVERGENCE=" + logDateFormat.format(new Timestamp(Double.valueOf(timeOfConvergenceS * 1000d).longValue())));
 
-        if (ttMS > startTimeMS && ttMS < timeOfConvergenceS * 1000d) {
+        if (timeOfCheck < timeOfConvergenceS) {
             // Use additional line of convergence
             Log.e("WEIGHT LINE", "Using CONVERGENCE");
             kReal.postValue(kRealz);
@@ -251,6 +249,12 @@ public class MainActivity extends AppCompatActivity {
             kReal.postValue(k);
             bReal.postValue(b);
         }
+    }
+
+    private Pair<Double, Double> getLineKoeffByTwoPoints(double x1, double y1, double x2, double y2) {
+        double koef1 = (y2 - y1) / (x2 - x1);
+        double koef2 = (y1 - koef1 * x1);
+        return new Pair<>(koef1, koef2);
     }
 
     private void recalculateKoefMNK() {
