@@ -24,7 +24,6 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import java.sql.Timestamp;
-import java.text.SimpleDateFormat;
 import java.util.Locale;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -52,7 +51,7 @@ public class MainActivity extends AppCompatActivity {
     private MutableLiveData<Double> bReal = new MutableLiveData<>(0d);
 
     // Time of converge
-    private MutableLiveData<Long> timeOfConverge = new MutableLiveData<>(0L);
+    private MutableLiveData<Long> timeOfConvergeMS = new MutableLiveData<>(0L);
 
     // Time of last weighting
     private long lastWeightTime;
@@ -78,13 +77,24 @@ public class MainActivity extends AppCompatActivity {
         final Observer<Double> arrowObserver = new Observer<Double>() {
             @Override
             public void onChanged(@Nullable final Double newValue) {
-                if (newValue < 0) {
-                    arrowV.setImageResource(R.drawable.ic_arrow_down);
-                } else {
-                    arrowV.setImageResource(R.drawable.ic_arrow_up);
-                }
-                if (appHasEnoughData) {
-                    arrowV.setVisibility(View.VISIBLE);
+                Log.d("kReal", "Changed real koeff.");
+                Double checkVal;
+                if (timeOfConvergeMS.getValue() != 0 ) {
+                    if (System.currentTimeMillis() < timeOfConvergeMS.getValue()) {
+                        checkVal = kReal.getValue();
+                    } else {
+                        checkVal = k;
+                    }
+                    //Log.e("MAIN", "System current time: " + System.currentTimeMillis() + " converged time: " + timeOfConvergeMS.getValue());
+                    //Log.e("MAIN", "Check arrow value: " + checkVal);
+                    if (checkVal < 0) {
+                        arrowV.setImageResource(R.drawable.ic_arrow_down);
+                    } else {
+                        arrowV.setImageResource(R.drawable.ic_arrow_up);
+                    }
+                    if (appHasEnoughData) {
+                        arrowV.setVisibility(View.VISIBLE);
+                    }
                 }
             }
         };
@@ -96,7 +106,7 @@ public class MainActivity extends AppCompatActivity {
         Pair<Long, Double> res2 = db.GetLastResult();
         // Check Last Result exists
         if (res2.first != -1L) {
-            Log.e("Last Result", "Weight: " + res2.second + " At: " + logDateFormat.format(new Timestamp(res2.first*1000L)));
+            Log.e("Last Result", "Weight: " + res2.second + " At: " + logDateFormat.format(new Timestamp(res2.first * 1000L)));
             lastWeightTime = res2.first;
             initAtStart(res2.second);
         }
@@ -159,7 +169,7 @@ public class MainActivity extends AppCompatActivity {
     private double getWeightCalculated() {
         long curTime = System.currentTimeMillis();
         double timeS = ((double) curTime / 1000d);
-        if (curTime < timeOfConverge.getValue()) {
+        if (curTime < timeOfConvergeMS.getValue()) {
             return kReal.getValue() * timeS + bReal.getValue();
         } else {
             return k * timeS + b;
@@ -225,7 +235,7 @@ public class MainActivity extends AppCompatActivity {
         double weightAtConvergence = timeOfConvergenceS * k + b;
 
         // Storing convergence time
-        timeOfConverge.postValue(Double.valueOf(timeOfConvergenceS).longValue() * 1000L);
+        timeOfConvergeMS.postValue(Double.valueOf(timeOfConvergenceS).longValue() * 1000L);
 
         Pair<Double, Double> p2 = getLineKoeffByTwoPoints(timeS, weight, timeOfConvergenceS, weightAtConvergence);
         double kRealz = p2.first;
@@ -233,12 +243,12 @@ public class MainActivity extends AppCompatActivity {
         Log.e("New Converged", "K= " + kRealz + " B= " + bRealz);
 
         // Check time between last real weight and calculated time of convergence.
-        long timeOfCheck = System.currentTimeMillis() / 1000L;
+        long timeOfCheckS = System.currentTimeMillis() / 1000L;
 
         // Logging
-        Log.e("TIMING", "CURRENT TIME=" + logDateFormat.format(new Timestamp(timeOfCheck*1000L)) + " TIME OF CONVERGENCE=" + logDateFormat.format(new Timestamp(Double.valueOf(timeOfConvergenceS * 1000d).longValue())));
+        Log.e("TIMING", "CURRENT TIME=" + logDateFormat.format(new Timestamp(timeOfCheckS * 1000L)) + " TIME OF CONVERGENCE=" + logDateFormat.format(new Timestamp(Double.valueOf(timeOfConvergenceS * 1000d).longValue())));
 
-        if (timeOfCheck < timeOfConvergenceS) {
+        if (timeOfCheckS < timeOfConvergenceS) {
             // Use additional line of convergence
             Log.e("WEIGHT LINE", "Using CONVERGENCE");
             kReal.postValue(kRealz);
