@@ -1,14 +1,13 @@
 package com.example.weight_time;
 
-import static com.example.weight_time.consts.MAX_WEIGHT_VALUE;
-import static com.example.weight_time.consts.MIN_WEIGHT_VALUE;
-import static com.example.weight_time.consts.defaultFont;
-import static com.example.weight_time.consts.logDateFormat;
-import static com.example.weight_time.consts.updateClockTimeMillis;
-import static com.example.weight_time.consts.weightFormatterString;
-import static com.example.weight_time.consts.ws;
+import static com.example.weight_time.Constants.MAX_WEIGHT_VALUE;
+import static com.example.weight_time.Constants.MIN_WEIGHT_VALUE;
+import static com.example.weight_time.Constants.defaultFont;
+import static com.example.weight_time.Constants.logDateFormat;
+import static com.example.weight_time.Constants.updateClockTimeMillis;
+import static com.example.weight_time.Constants.weightFormatterString;
+import static com.example.weight_time.Constants.ws;
 
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.Observer;
@@ -35,23 +34,23 @@ public class MainActivity extends AppCompatActivity {
     // timer
     private Timer timer;
     // timer started?
-    private boolean timerState = false;
+    private boolean isTimerStarted = false;
     // Main text view
     private TextView weightTV;
     // Arrow image
     private ImageView arrowV;
-    // Enter of wieght
+    // Enter of weight
     private EditText mainET;
-    // Calculated koeff
+    // Calculated coefficient
     private Double k;
     private Double b;
 
-    // Real line koeff
-    private MutableLiveData<Double> kReal = new MutableLiveData<>(0d);
-    private MutableLiveData<Double> bReal = new MutableLiveData<>(0d);
+    // Real line coefficient
+    private final MutableLiveData<Double> kReal = new MutableLiveData<>(0d);
+    private final MutableLiveData<Double> bReal = new MutableLiveData<>(0d);
 
     // Time of converge
-    private MutableLiveData<Long> timeOfConvergeMS = new MutableLiveData<>(0L);
+    private final MutableLiveData<Long> timeOfConvergeMS = new MutableLiveData<>(0L);
 
     // Time of last weighting
     private long lastWeightTime;
@@ -67,34 +66,31 @@ public class MainActivity extends AppCompatActivity {
         arrowV = findViewById(R.id.arrow);
         mainET = findViewById(R.id.textInput);
 
-        Typeface myTypeface = Typeface.createFromAsset(this.getAssets(), defaultFont);
-        weightTV.setTypeface(myTypeface);
+        Typeface typeface = Typeface.createFromAsset(this.getAssets(), defaultFont);
+        weightTV.setTypeface(typeface);
         weightTV.setTextSize(48f);
         weightTV.setTextColor(Color.RED);
 
         arrowV.setImageResource(R.drawable.ic_arrow_up);
 
-        final Observer<Double> arrowObserver = new Observer<Double>() {
-            @Override
-            public void onChanged(@Nullable final Double newValue) {
-                Log.d("kReal", "Changed real koeff.");
-                Double checkVal;
-                if (timeOfConvergeMS.getValue() != 0 ) {
-                    if (System.currentTimeMillis() < timeOfConvergeMS.getValue()) {
-                        checkVal = kReal.getValue();
-                    } else {
-                        checkVal = k;
-                    }
-                    //Log.e("MAIN", "System current time: " + System.currentTimeMillis() + " converged time: " + timeOfConvergeMS.getValue());
-                    //Log.e("MAIN", "Check arrow value: " + checkVal);
-                    if (checkVal < 0) {
-                        arrowV.setImageResource(R.drawable.ic_arrow_down);
-                    } else {
-                        arrowV.setImageResource(R.drawable.ic_arrow_up);
-                    }
-                    if (appHasEnoughData) {
-                        arrowV.setVisibility(View.VISIBLE);
-                    }
+        final Observer<Double> arrowObserver = newValue -> {
+            Log.d("kReal", "Changed real coefficient.");
+            Double valueToCheck;
+            if (timeOfConvergeMS.getValue() != 0) {
+                if (System.currentTimeMillis() < timeOfConvergeMS.getValue()) {
+                    valueToCheck = kReal.getValue();
+                } else {
+                    valueToCheck = k;
+                }
+                // Log.e("MAIN", "System current time: " + System.currentTimeMillis() + " converged time: " + timeOfConvergeMS.getValue());
+                // Log.e("MAIN", "Check arrow value: " + valueToCheck);
+                if (valueToCheck < 0) {
+                    arrowV.setImageResource(R.drawable.ic_arrow_down);
+                } else {
+                    arrowV.setImageResource(R.drawable.ic_arrow_up);
+                }
+                if (appHasEnoughData) {
+                    arrowV.setVisibility(View.VISIBLE);
                 }
             }
         };
@@ -113,14 +109,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void initAtStart(Double weight) {
-        Executors.newSingleThreadExecutor().execute(new Runnable() {
-            @Override
-            public void run() {
-                recalculateKoefMNK();
-                if (appHasEnoughData) {
-                    calculateRealLineKoeff(weight, lastWeightTime);
-                    startTimer();
-                }
+        Executors.newSingleThreadExecutor().execute(() -> {
+            recalculateCoefficientMNK();
+            if (appHasEnoughData) {
+                calculateRealLineCoefficient(weight, lastWeightTime);
+                startTimer();
             }
         });
     }
@@ -129,9 +122,9 @@ public class MainActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
 
-        if (timerState) {
+        if (isTimerStarted) {
             timer.cancel();
-            timerState = false;
+            isTimerStarted = false;
         }
     }
 
@@ -145,20 +138,31 @@ public class MainActivity extends AppCompatActivity {
 
     private void startTimer() {
         // Timer
-        if (!timerState) {
+        if (!isTimerStarted) {
             timer = new Timer();
-            timer.scheduleAtFixedRate(new TimerTask() {
-                @Override
-                public void run() {
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            onTimeChanged();
-                        }
-                    });
-                }
-            }, 0, updateClockTimeMillis); //put here time 1000 milliseconds=1 second
-            timerState = true;
+
+            /* OLD ONE
+            timer.scheduleAtFixedRate(
+                    new TimerTask() {
+                    @Override
+                    public void run() {runOnUiThread(() -> onTimeChanged());}
+                    },
+                    0,
+                    updateClockTimeMillis
+            ); //put here time 1000 milliseconds=1 second
+             */
+
+            timer.schedule(new TimerTask() {
+                               @Override
+                               public void run() {
+                                   runOnUiThread(() -> onTimeChanged());
+                               }
+                           },
+                    0,
+                    updateClockTimeMillis //put here time 1000 milliseconds=1 second
+            );
+
+            isTimerStarted = true;
         }
     }
 
@@ -204,40 +208,37 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        Executors.newSingleThreadExecutor().execute(new Runnable() {
-            @Override
-            public void run() {
-                // Write new value to DB
-                long currentTimeS = System.currentTimeMillis() / 1000L;
-                db.WriteNewWeight(newWeightValue, currentTimeS);
+        Executors.newSingleThreadExecutor().execute(() -> {
+            // Write new value to DB
+            long currentTimeS = System.currentTimeMillis() / 1000L;
+            db.WriteNewWeight(newWeightValue, currentTimeS);
 
-                lastWeightTime = currentTimeS;
+            lastWeightTime = currentTimeS;
 
-                // Recalculate koeff calculated
-                recalculateKoefMNK();
+            // Recalculate coefficient calculated
+            recalculateCoefficientMNK();
 
-                // Calculate Real line==================================
-                if (appHasEnoughData) {
-                    calculateRealLineKoeff(newWeightValue, currentTimeS);
-                }
+            // Calculate Real line==================================
+            if (appHasEnoughData) {
+                calculateRealLineCoefficient(newWeightValue, currentTimeS);
             }
         });
     }
 
-    private void calculateRealLineKoeff(double weight, double timeS) {
+    private void calculateRealLineCoefficient(double weight, double timeS) {
 
         // double timeOfConvergenceS = (weight - timeS * k * n - b) / (k * (1 - n));
         // double weightAtConvergence = timeOfConvergenceS * k + b;
 
-        double timeNeededtoConvergeS = (Math.abs((k * timeS + b) - weight) / ws) * 3600 * 24;
+        double timeNeededToConvergeS = (Math.abs((k * timeS + b) - weight) / ws) * 3600 * 24;
 
-        double timeOfConvergenceS = timeS + timeNeededtoConvergeS;
+        double timeOfConvergenceS = timeS + timeNeededToConvergeS;
         double weightAtConvergence = timeOfConvergenceS * k + b;
 
         // Storing convergence time
         timeOfConvergeMS.postValue(Double.valueOf(timeOfConvergenceS).longValue() * 1000L);
 
-        Pair<Double, Double> p2 = getLineKoeffByTwoPoints(timeS, weight, timeOfConvergenceS, weightAtConvergence);
+        Pair<Double, Double> p2 = getLineCoefficientByTwoPoints(timeS, weight, timeOfConvergenceS, weightAtConvergence);
         double kRealz = p2.first;
         double bRealz = p2.second;
         Log.e("New Converged", "K= " + kRealz + " B= " + bRealz);
@@ -261,14 +262,14 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private Pair<Double, Double> getLineKoeffByTwoPoints(double x1, double y1, double x2, double y2) {
-        double koef1 = (y2 - y1) / (x2 - x1);
-        double koef2 = (y1 - koef1 * x1);
-        return new Pair<>(koef1, koef2);
+    private Pair<Double, Double> getLineCoefficientByTwoPoints(double x1, double y1, double x2, double y2) {
+        double coefficient1 = (y2 - y1) / (x2 - x1);
+        double coefficient2 = (y1 - coefficient1 * x1);
+        return new Pair<>(coefficient1, coefficient2);
     }
 
-    private void recalculateKoefMNK() {
-        Pair<Double, Double> res = db.GetKoeffs();
+    private void recalculateCoefficientMNK() {
+        Pair<Double, Double> res = db.GetCoefficients();
         // check something returned
         if (!((res.first == -1d) && (res.second == -1d))) {
             appHasEnoughData = true;

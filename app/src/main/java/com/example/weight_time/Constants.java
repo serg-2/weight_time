@@ -1,8 +1,9 @@
 package com.example.weight_time;
 
 import java.text.SimpleDateFormat;
+import java.util.Locale;
 
-public class consts {
+public class Constants {
     public static final int updateClockTimeMillis = 200;
     public static final int MIN_WEIGHT_VALUE = 3;
     public static final int MAX_WEIGHT_VALUE = 300;
@@ -11,7 +12,7 @@ public class consts {
     public static final String defaultFont = "S15.otf";
     public static final String weightFormatterString = "%011.8f";
 
-    // ---------- DB CONSTS
+    // ---------- DataBase constants
     public static final String tableName = "weight_table";
     public static final String timestampColumnName = "timestamp";
     public static final String weightColumnName = "weight";
@@ -31,5 +32,5 @@ public class consts {
             "DROP TABLE IF EXISTS " + tableName;
 
     // 2021-03-24 16:48:05
-    public static final SimpleDateFormat logDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    public static final SimpleDateFormat logDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", new Locale("ru","RU"));
 }

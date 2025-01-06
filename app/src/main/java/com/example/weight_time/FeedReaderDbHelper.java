@@ -1,7 +1,7 @@
 package com.example.weight_time;
 
-import static com.example.weight_time.consts.SQL_CREATE_ENTRIES;
-import static com.example.weight_time.consts.SQL_DELETE_ENTRIES;
+import static com.example.weight_time.Constants.SQL_CREATE_ENTRIES;
+import static com.example.weight_time.Constants.SQL_DELETE_ENTRIES;
 
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;

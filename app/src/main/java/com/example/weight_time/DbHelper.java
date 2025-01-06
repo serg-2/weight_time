@@ -1,9 +1,9 @@
 package com.example.weight_time;
 
-import static com.example.weight_time.consts.NUMBER_OF_MONTHS_TO_USE;
-import static com.example.weight_time.consts.tableName;
-import static com.example.weight_time.consts.timestampColumnName;
-import static com.example.weight_time.consts.weightColumnName;
+import static com.example.weight_time.Constants.NUMBER_OF_MONTHS_TO_USE;
+import static com.example.weight_time.Constants.tableName;
+import static com.example.weight_time.Constants.timestampColumnName;
+import static com.example.weight_time.Constants.weightColumnName;
 
 import android.content.ContentValues;
 import android.content.Context;
@@ -16,12 +16,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class DbHelper {
-    private FeedReaderDbHelper dbHelper;
+    private final FeedReaderDbHelper dbHelper;
 
-    private SQLiteDatabase dbWrite;
-    private SQLiteDatabase dbRead;
+    private final SQLiteDatabase dbWrite;
+    private final SQLiteDatabase dbRead;
 
-    private long minX = 0L;
+    private final long minimumX = 0L;
 
     public DbHelper(Context context) {
         dbHelper = new FeedReaderDbHelper(context);
@@ -41,7 +41,7 @@ public class DbHelper {
         Log.d("DB", "Values inserted: time: " + curTime + " weight: " + weight);
     }
 
-    public Pair<Double, Double> GetKoeffs() {
+    public Pair<Double, Double> GetCoefficients() {
         // Define a projection that specifies which columns from the database
         // you will actually use after this query.
         String[] nameOfColumns = {
@@ -80,10 +80,10 @@ public class DbHelper {
         }
 
         // Calculating K
-        double sumX = CalcSum(rawX);
-        double sumY = CalcSum(rawY);
-        double sumXY = CalcSumMultiplication(rawX, rawY);
-        double sumXX = CalcSumMultiplication(rawX, rawX);
+        double sumX = Sum(rawX);
+        double sumY = Sum(rawY);
+        double sumXY = SumOfMultiplication(rawX, rawY);
+        double sumXX = SumOfMultiplication(rawX, rawX);
 
         // Calculating k and b for line in SECONDS
         double k = (la * sumXY - sumX * sumY) / (la * sumXX - sumX * sumX);
@@ -114,7 +114,7 @@ public class DbHelper {
             long lastTime = cursor.getLong(0);
             double lastWeight = cursor.getLong(1);
             cursor.close();
-            return new Pair<>(lastTime - Double.valueOf(minX).longValue(), lastWeight);
+            return new Pair<>(lastTime - Double.valueOf(minimumX).longValue(), lastWeight);
         } else {
             cursor.close();
             return new Pair<>(-1L, -1d);
@@ -131,21 +131,19 @@ public class DbHelper {
         dbHelper.close();
     }
 
-    private double CalcSum(List<Double> a) {
-        double sum = 0;
-        for (Double value : a) {
-            sum += value;
-        }
-        return sum;
+    private double Sum(List<Double> a) {
+        return a.stream()
+                .mapToDouble(i-> i)
+                .sum();
     }
 
-    private double CalcSumMultiplication(List<Double> a, List<Double> b) {
-        if (a.size() != b.size()) {
+    private double SumOfMultiplication(List<Double> list1, List<Double> list2) {
+        if (list1.size() != list2.size()) {
             return 0;
         }
         double sum = 0;
-        for (int i = 0; i < a.size(); i++) {
-            sum += a.get(i) * b.get(i);
+        for (int i = 0; i < list1.size(); i++) {
+            sum += list1.get(i) * list2.get(i);
         }
         return sum;
     }
