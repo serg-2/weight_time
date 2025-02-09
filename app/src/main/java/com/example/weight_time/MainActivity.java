@@ -2,6 +2,7 @@ package com.example.weight_time;
 
 import static com.example.weight_time.Constants.MAX_WEIGHT_VALUE;
 import static com.example.weight_time.Constants.MIN_WEIGHT_VALUE;
+import static com.example.weight_time.Constants.NUMBER_OF_TILES_SHARED;
 import static com.example.weight_time.Constants.defaultFont;
 import static com.example.weight_time.Constants.logDateFormat;
 import static com.example.weight_time.Constants.updateClockTimeMillis;
@@ -11,6 +12,12 @@ import static com.example.weight_time.Constants.ws;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.Observer;
+import androidx.lifecycle.ViewModel;
+import androidx.lifecycle.ViewModelProvider;
+import androidx.lifecycle.ViewModelStoreOwner;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+import androidx.recyclerview.widget.StaggeredGridLayoutManager;
 
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -22,11 +29,17 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.example.weight_time.models.MainViewModel;
+import com.example.weight_time.sharedPreferences.SharedPreference;
+import com.example.weight_time.timer.MyTimer;
+
 import java.sql.Timestamp;
 import java.util.Locale;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.Executors;
+
+import lombok.Getter;
 
 public class MainActivity extends AppCompatActivity {
     // database
@@ -58,10 +71,27 @@ public class MainActivity extends AppCompatActivity {
     // Has enough data to show
     private boolean appHasEnoughData = false;
 
+    // Recyclerview
+    private RecyclerView recyclerView;
+
+    // ViewModel
+    public MainViewModel mainViewModel;
+    @Getter
+    private SharedPreference sharedPreference;
+
+    // Alarm
+    private MyTimer myTimer;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        mainViewModel = getVieModel(MainViewModel.class);
+
+        // Shared preferences
+        sharedPreference = new SharedPreference(getApplicationContext());
+        mainViewModel.initViewModel(sharedPreference.getValueInteger(NUMBER_OF_TILES_SHARED));
+
         weightTV = findViewById(R.id.weight);
         arrowV = findViewById(R.id.arrow);
         mainET = findViewById(R.id.textInput);
@@ -106,6 +136,21 @@ public class MainActivity extends AppCompatActivity {
             lastWeightTime = res2.first;
             initAtStart(res2.second);
         }
+
+        // Recycler view
+        recyclerView = findViewById(R.id.recyclerView);
+        // Setting the layout as Staggered Grid for vertical orientation
+        StaggeredGridLayoutManager staggeredGridLayoutManager = new StaggeredGridLayoutManager(3, LinearLayoutManager.VERTICAL);
+        recyclerView.setLayoutManager(staggeredGridLayoutManager);
+
+        // Sending reference and data to Adapter
+        Adapter adapter = new Adapter(MainActivity.this, mainViewModel, sharedPreference);
+
+        // Setting Adapter to RecyclerView
+        recyclerView.setAdapter(adapter);
+
+        // Alarm
+        myTimer = new MyTimer(adapter::someOutput);
     }
 
     private void initAtStart(Double weight) {
@@ -121,11 +166,11 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-
         if (isTimerStarted) {
             timer.cancel();
             isTimerStarted = false;
         }
+        myTimer.pause();
     }
 
     @Override
@@ -134,24 +179,13 @@ public class MainActivity extends AppCompatActivity {
         if (appHasEnoughData) {
             startTimer();
         }
+        myTimer.resume();
     }
 
     private void startTimer() {
         // Timer
         if (!isTimerStarted) {
             timer = new Timer();
-
-            /* OLD ONE
-            timer.scheduleAtFixedRate(
-                    new TimerTask() {
-                    @Override
-                    public void run() {runOnUiThread(() -> onTimeChanged());}
-                    },
-                    0,
-                    updateClockTimeMillis
-            ); //put here time 1000 milliseconds=1 second
-             */
-
             timer.schedule(new TimerTask() {
                                @Override
                                public void run() {
@@ -278,5 +312,14 @@ public class MainActivity extends AppCompatActivity {
             b = res.second;
             Log.e("New Calculated", "K= " + res.first + " B= " + res.second);
         }
+    }
+
+    // TECH PART ===================================================================
+    protected <T extends ViewModel> T getVieModel(Class<T> clazz) {
+        return getVieModel(this, clazz);
+    }
+
+    protected <T extends ViewModel> T getVieModel(ViewModelStoreOwner owner, Class<T> clazz) {
+        return new ViewModelProvider(owner).get(clazz);
     }
 }

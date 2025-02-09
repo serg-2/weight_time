@@ -53,4 +53,11 @@
         android:text="ADD"
         android:onClick="onAddPressed"/>
 
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/textInput" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

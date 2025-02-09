@@ -179,6 +179,5 @@ public class DbHelper {
         }
         return minX;
     }
-
      */
 }
