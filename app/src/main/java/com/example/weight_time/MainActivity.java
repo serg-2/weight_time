@@ -2,7 +2,7 @@ package com.example.weight_time;
 
 import static com.example.weight_time.Constants.MAX_WEIGHT_VALUE;
 import static com.example.weight_time.Constants.MIN_WEIGHT_VALUE;
-import static com.example.weight_time.Constants.NUMBER_OF_TILES_SHARED;
+import static com.example.weight_time.Constants.SHARED_NUMBER_OF_TILES;
 import static com.example.weight_time.Constants.defaultFont;
 import static com.example.weight_time.Constants.logDateFormat;
 import static com.example.weight_time.Constants.updateClockTimeMillis;
@@ -25,6 +25,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.util.Pair;
 import android.view.View;
+import android.view.animation.OvershootInterpolator;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -39,6 +40,9 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.Executors;
 
+import jp.wasabeef.recyclerview.adapters.AlphaInAnimationAdapter;
+import jp.wasabeef.recyclerview.animators.LandingAnimator;
+import jp.wasabeef.recyclerview.animators.SlideInUpAnimator;
 import lombok.Getter;
 
 public class MainActivity extends AppCompatActivity {
@@ -76,6 +80,8 @@ public class MainActivity extends AppCompatActivity {
 
     // ViewModel
     public MainViewModel mainViewModel;
+    private Adapter adapter;
+
     @Getter
     private SharedPreference sharedPreference;
 
@@ -90,7 +96,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Shared preferences
         sharedPreference = new SharedPreference(getApplicationContext());
-        mainViewModel.initViewModel(sharedPreference.getValueInteger(NUMBER_OF_TILES_SHARED));
+        mainViewModel.initViewModel(sharedPreference);
 
         weightTV = findViewById(R.id.weight);
         arrowV = findViewById(R.id.arrow);
@@ -142,15 +148,29 @@ public class MainActivity extends AppCompatActivity {
         // Setting the layout as Staggered Grid for vertical orientation
         StaggeredGridLayoutManager staggeredGridLayoutManager = new StaggeredGridLayoutManager(3, LinearLayoutManager.VERTICAL);
         recyclerView.setLayoutManager(staggeredGridLayoutManager);
+        // TODO: recycler View animator
+        //LandingAnimator itemAnimator = new LandingAnimator(new OvershootInterpolator(1f));
+        //itemAnimator.setRemoveDuration(1000L);
+        //recyclerView.setItemAnimator(itemAnimator);
 
         // Sending reference and data to Adapter
-        Adapter adapter = new Adapter(MainActivity.this, mainViewModel, sharedPreference);
-
-        // Setting Adapter to RecyclerView
-        recyclerView.setAdapter(adapter);
+        // TODO: adapter animator
+//        AlphaInAnimationAdapter animAdapter = new AlphaInAnimationAdapter(new Adapter(this, mainViewModel, sharedPreference));
+//        animAdapter.setDuration(1000);
+//        animAdapter.setInterpolator(new OvershootInterpolator());
+//        animAdapter.setFirstOnly(false);
+//        adapter = animAdapter;
+        adapter = new Adapter(this, mainViewModel, sharedPreference);
+        mainViewModel.getCalories().observe(this, calories ->
+                {
+                    // adapter = new AlphaInAnimationAdapter(new Adapter(this, mainViewModel, sharedPreference));
+                    adapter = new Adapter(this, mainViewModel, sharedPreference);
+                    recyclerView.setAdapter(adapter);
+                }
+        );
 
         // Alarm
-        myTimer = new MyTimer(adapter::someOutput);
+        myTimer = new MyTimer(sharedPreference, mainViewModel::reinit, 3, 30);
     }
 
     private void initAtStart(Double weight) {
@@ -170,7 +190,7 @@ public class MainActivity extends AppCompatActivity {
             timer.cancel();
             isTimerStarted = false;
         }
-        myTimer.pause();
+        myTimer.onPause();
     }
 
     @Override
@@ -179,7 +199,7 @@ public class MainActivity extends AppCompatActivity {
         if (appHasEnoughData) {
             startTimer();
         }
-        myTimer.resume();
+        myTimer.onResume();
     }
 
     private void startTimer() {

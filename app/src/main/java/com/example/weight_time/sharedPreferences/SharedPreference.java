@@ -1,6 +1,6 @@
 package com.example.weight_time.sharedPreferences;
 
-import static com.example.weight_time.Constants.NUMBER_OF_TILES_SHARED;
+import static com.example.weight_time.Constants.SHARED_NUMBER_OF_TILES;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -41,7 +41,7 @@ public class SharedPreference {
     public void clearSharedPreference() {
         sharedPref
                 .edit()
-                .remove(NUMBER_OF_TILES_SHARED)
+                .remove(SHARED_NUMBER_OF_TILES)
                 .apply();
     }
 

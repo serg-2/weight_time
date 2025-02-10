@@ -1,6 +1,7 @@
 package com.example.weight_time;
 
-import static com.example.weight_time.Constants.NUMBER_OF_TILES_SHARED;
+import static com.example.weight_time.Constants.MAX_CALORIES;
+import static com.example.weight_time.Constants.SHARED_NUMBER_OF_TILES;
 
 import android.content.Context;
 import android.util.Log;
@@ -14,6 +15,9 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.weight_time.models.MainViewModel;
 import com.example.weight_time.sharedPreferences.SharedPreference;
+
+import java.util.ArrayList;
+import java.util.Collections;
 
 // Extends the Adapter class to RecyclerView.Adapter
 // and implement the unimplemented methods
@@ -62,22 +66,11 @@ public class Adapter extends RecyclerView.Adapter<Adapter.ViewHolder> {
 
         private void onClick(View v) {
             int position = getAdapterPosition();
-            // Log.e("MAIN", "CLICK " + position);
+            // Log.d("MAIN", "CLICK " + position);
             viewModel.remove(position);
             notifyItemRemoved(position);
-            sharedPreference.save(NUMBER_OF_TILES_SHARED, getItemCount());
+            sharedPreference.save(SHARED_NUMBER_OF_TILES, getItemCount());
         }
-    }
-
-    // Reinit adapter by time
-    public void reinitAdapter() {
-        viewModel.resetCalories();
-        notifyDataSetChanged();
-        sharedPreference.save(NUMBER_OF_TILES_SHARED, getItemCount());
-    }
-
-    public void someOutput() {
-        Log.e("CALLBACK", "TEST!");
     }
 
 }

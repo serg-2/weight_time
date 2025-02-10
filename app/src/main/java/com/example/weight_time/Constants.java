@@ -34,8 +34,10 @@ public class Constants {
     // 2021-03-24 16:48:05
     public static final SimpleDateFormat logDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", new Locale("ru","RU"));
 
-    public static final String NUMBER_OF_TILES_SHARED = "tiles";
+    public static final String SHARED_NUMBER_OF_TILES = "tiles";
+    public static final String SHARED_LAST_RUN = "last_run";
     public static final int MAX_CALORIES = 15;
-    public static final String INTENT_ACTION = "com.weight_time";
 
+    public static final long TIME_BETWEEN_RESET_SECS = 24*3600;
+    //public static final long TIME_BETWEEN_RESET_SECS = 15;
 }
