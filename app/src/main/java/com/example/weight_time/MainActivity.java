@@ -2,7 +2,6 @@ package com.example.weight_time;
 
 import static com.example.weight_time.Constants.MAX_WEIGHT_VALUE;
 import static com.example.weight_time.Constants.MIN_WEIGHT_VALUE;
-import static com.example.weight_time.Constants.SHARED_NUMBER_OF_TILES;
 import static com.example.weight_time.Constants.defaultFont;
 import static com.example.weight_time.Constants.logDateFormat;
 import static com.example.weight_time.Constants.updateClockTimeMillis;
@@ -25,7 +24,6 @@ import android.os.Bundle;
 import android.util.Log;
 import android.util.Pair;
 import android.view.View;
-import android.view.animation.OvershootInterpolator;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -40,9 +38,6 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.Executors;
 
-import jp.wasabeef.recyclerview.adapters.AlphaInAnimationAdapter;
-import jp.wasabeef.recyclerview.animators.LandingAnimator;
-import jp.wasabeef.recyclerview.animators.SlideInUpAnimator;
 import lombok.Getter;
 
 public class MainActivity extends AppCompatActivity {
@@ -238,6 +233,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         db.Destroy();
+        myTimer.onDestroy();
     }
 
     public void onAddPressed(View view) {

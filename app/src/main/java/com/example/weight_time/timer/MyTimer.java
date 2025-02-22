@@ -14,7 +14,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-public class MyTimer {
+public class MyTimer implements MyTimerInterface {
 
     public static final String TAG = "TIMER";
 
@@ -25,11 +25,6 @@ public class MyTimer {
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     ScheduledFuture<?> future;
-
-    @FunctionalInterface
-    public interface Function {
-        void apply();
-    }
 
     public MyTimer(SharedPreference sharedPreference, Function timerTask, int hour, int minute) {
         this.timerTask = timerTask;
@@ -52,9 +47,12 @@ public class MyTimer {
         Log.i(TAG, "Planned time of next start: " + logDateFormat.format(timeOfNextEvent.getTime()));
     }
 
-    public void onPause() {
+    @Override
+    public void onDestroy() {
+        scheduler.shutdown();
     }
 
+    @Override
     public void onResume() {
         // need to immediate start
         if (needToImmediateStart) {
